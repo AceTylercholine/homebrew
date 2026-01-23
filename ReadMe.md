@@ -46,7 +46,6 @@ function [fdrArrayOrgOrder] = fdr3(pvals)
     % Fill in the non-nan values
     fdrArrayOrgOrder(~nanIndices) = correctedValidPvals;
 
-
     function [fdrArrayOrgOrder] = fdr_no_nans(pvals)
 
         pvalsLen = length(pvals);
