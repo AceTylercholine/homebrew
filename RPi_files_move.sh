@@ -2,9 +2,17 @@
 
 # Define source and base target directories
 SRC_DIR="/var/www/html/media"
-TARGET_BASE="/home/pi/storage_new/Soziale_Neurobiologie/MXBI/2.Data/RawData"
+MOUNT_POINT="/home/pi/storage_new"
+TARGET_BASE="$MOUNT_POINT/Soziale_Neurobiologie/MXBI/2.Data/RawData"
 
 echo "Starting media cleanup..."
+# Verify the network drive is actually mounted
+if ! mountpoint -q "$MOUNT_POINT"; then
+	echo "Error: Network drive is not mounted at $MOUNT_POINT."
+	echo "Please mount the drive and try again."
+	read -p "Press Enter to close..."
+	exit 1
+fi
 
 # Delete all .jpg files
 echo "Deleting .jpg files from $SRC_DIR..."
