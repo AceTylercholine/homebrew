@@ -8,10 +8,10 @@ TARGET_BASE="$MOUNT_POINT/Soziale_Neurobiologie/MXBI/2.Data/RawData"
 echo "Starting media cleanup..."
 # Verify the network drive is actually mounted
 if ! mountpoint -q "$MOUNT_POINT"; then
-	echo "Error: Network drive is not mounted at $MOUNT_POINT."
-	echo "Please mount the drive and try again."
-	read -p "Press Enter to close..."
-	exit 1
+    echo "Error: Network drive is not mounted at $MOUNT_POINT."
+    echo "Please mount the drive and try again."
+    read -p "Press Enter to close..."
+    exit 1
 fi
 
 # Delete all .jpg files
@@ -21,38 +21,45 @@ echo ".jpg files deleted."
 
 echo "Scanning for .h264 files..."
 
-count=0
-# Iterate through all .h264 files
-for file in "$SRC_DIR"/*.h264; do
-    # Exit loop gracefully if no .h264 files are found
-    [ -e "$file" ] || { echo "No .h264 files found."; break; }
+# Enable nullglob so the array is empty if no files match
+shopt -s nullglob
+files=("$SRC_DIR"/*.h264)
+total=${#files[@]}
+shopt -u nullglob # Turn it back off to maintain standard bash behavior
 
-    filename=$(basename "$file")
+if [ "$total" -eq 0 ]; then
+    echo "No .h264 files found."
+else
+    echo "Found $total file(s). Starting transfer..."
+    count=0
 
-    # Extract the 8-digit date (YYYYMMDD) from the filename 
-    date_str=$(echo "$filename" | cut -d'_' -f3)
+    for file in "${files[@]}"; do
+        filename=$(basename "$file")
+        date_str=$(echo "$filename" | cut -d'_' -f3)
 
-    # Validate that the extracted string is exactly 8 digits
-    if [[ "$date_str" =~ ^[0-9]{8}$ ]]; then
-        # Extract the year and month (YYYYMM)
-        yyyy_mm="${date_str:0:6}"
-        
-        # Define the full target directory path
-        target_dir="$TARGET_BASE/$yyyy_mm/$date_str"
+        if [[ "$date_str" =~ ^[0-9]{8}$ ]]; then
+            yyyy_mm="${date_str:0:6}"
+            target_dir="$TARGET_BASE/$yyyy_mm/$date_str"
 
-        # Create the target directory structure
-        mkdir -p "$target_dir"
+            mkdir -p "$target_dir"
 
-        # Move the video file and fix ownership
-        sudo mv "$file" "$target_dir/"
-        sudo chown pi:pi "$target_dir/$filename"
-        
-        ((count++))
-        echo "Moved [$count]: $filename"
-    else
-        echo "Warning: $filename skipped (invalid date format)."
-    fi
-done
+            echo -e "\nMoving file $((count+1)) of $total: $filename"
+            
+            # Use rsync to show real-time transfer progress, then delete the source
+            sudo rsync -ah --progress --remove-source-files "$file" "$target_dir/"
+            
+            # Verify the transfer was successful before altering ownership
+            if [ $? -eq 0 ]; then
+                sudo chown pi:pi "$target_dir/$filename"
+                ((count++))
+            else
+                echo "Error: Transfer failed for $filename. File retained at source."
+            fi
+        else
+            echo -e "\nWarning: $filename skipped (invalid date format)."
+        fi
+    done
+fi
 
-echo "Process complete. Moved $count .h264 files."
+echo -e "\nProcess complete. Moved $count .h264 files."
 read -p "Press Enter to close..."
